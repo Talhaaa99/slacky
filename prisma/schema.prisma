@@ -1,0 +1,26 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SlackCommunity {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  tags        String   // Comma-separated tags
+  category    String
+  inviteUrl   String
+  website     String?
+  logoUrl     String?
+  sourcePage  String?  // Original page crawled (if applicable)
+  embedding   String?  // JSON string of embedding vector
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
