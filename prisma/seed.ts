@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { generateEmbedding, stringifyEmbedding } from "../src/lib/free-ai";
 
 const prisma = new PrismaClient();
 
@@ -103,8 +104,15 @@ async function main() {
 
   for (const community of sampleCommunities) {
     try {
+      // Generate embedding for the community
+      const embeddingText = `${community.name} ${community.description} ${community.tags}`;
+      const embedding = await generateEmbedding(embeddingText);
+
       await prisma.slackCommunity.create({
-        data: community,
+        data: {
+          ...community,
+          embedding: stringifyEmbedding(embedding.embedding),
+        },
       });
 
       console.log(`Added: ${community.name}`);

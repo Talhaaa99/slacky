@@ -19,10 +19,7 @@ export function AgenticSearchBox({
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [interpretedQuery, setInterpretedQuery] = useState("");
-  const [suggestedFilters, setSuggestedFilters] = useState<{
-    categories: string[];
-    tags: string[];
-  }>({ categories: [], tags: [] });
+  const [suggestedFilters, setSuggestedFilters] = useState<string[]>([]);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -33,14 +30,13 @@ export function AgenticSearchBox({
     try {
       const result = await agenticSearchCommunities(query);
 
-      setInterpretedQuery(result.interpretedQuery);
+      setInterpretedQuery(result.interpretation);
       setSuggestedFilters(result.suggestedFilters);
 
       // Transform results for display
       const transformedResults = result.results.map((item) => ({
-        ...item.community,
-        similarity: item.similarity,
-        reasoning: item.reasoning,
+        ...item,
+        tags: item.tags || [],
       }));
 
       onResults(transformedResults);
@@ -101,47 +97,24 @@ export function AgenticSearchBox({
       )}
 
       {/* Suggested Filters */}
-      {(suggestedFilters.categories.length > 0 ||
-        suggestedFilters.tags.length > 0) && (
+      {suggestedFilters.length > 0 && (
         <Card className="bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-blue-800">
               Suggested Filters
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {suggestedFilters.categories.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-blue-700 mb-1">
-                  Categories:
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {suggestedFilters.categories.map((category, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                    >
-                      {category}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {suggestedFilters.tags.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-blue-700 mb-1">Tags:</p>
-                <div className="flex flex-wrap gap-1">
-                  {suggestedFilters.tags.slice(0, 5).map((tag, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+          <CardContent>
+            <div className="flex flex-wrap gap-1">
+              {suggestedFilters.slice(0, 10).map((filter, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {filter}
+                </span>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

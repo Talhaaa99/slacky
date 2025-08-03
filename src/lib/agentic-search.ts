@@ -3,84 +3,74 @@ import {
   generateQueryEmbedding,
   cosineSimilarity,
   parseEmbedding,
-} from "./embeddings";
-import OpenAI from "openai";
+  interpretQuery,
+} from "./free-ai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-export interface SearchResult {
-  community: any;
-  similarity: number;
-  reasoning: string;
+// Rate limiting helper
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export interface AgenticQueryResult {
-  results: SearchResult[];
-  interpretedQuery: string;
-  suggestedFilters: {
-    categories: string[];
-    tags: string[];
-  };
+interface CommunityWithEmbedding {
+  id: string;
+  name: string;
+  description: string;
+  tags: string;
+  category: string;
+  inviteUrl: string;
+  website: string | null;
+  logoUrl: string | null;
+  sourcePage: string | null;
+  embedding: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export async function agenticSearch(
-  query: string,
-  limit: number = 10
-): Promise<AgenticQueryResult> {
+export async function agenticSearch(query: string) {
   try {
-    // Step 1: Interpret the natural language query
-    const interpretedQuery = await interpretQuery(query);
+    await delay(100); // Rate limiting
+
+    // Step 1: Interpret the query using AI
+    const interpretation = await interpretQuery(query);
 
     // Step 2: Generate embedding for the query
-    const queryEmbedding = await generateQueryEmbedding(interpretedQuery);
+    const queryEmbedding = await generateQueryEmbedding(query);
 
     // Step 3: Get all communities with embeddings
-    const communities = await prisma.slackCommunity.findMany({
+    const communities = (await prisma.slackCommunity.findMany({
       where: {
-        embedding: {
-          not: null,
-        },
+        embedding: { not: null },
       },
-    });
+    })) as CommunityWithEmbedding[];
 
-    // Step 4: Calculate similarities and rank results
-    const results: SearchResult[] = [];
+    // Step 4: Calculate similarity scores
+    const scoredCommunities = communities
+      .map((community) => {
+        const communityEmbedding = parseEmbedding(community.embedding || "[]");
+        const similarity = cosineSimilarity(queryEmbedding, communityEmbedding);
 
-    for (const community of communities) {
-      if (!community.embedding) continue;
-
-      const communityEmbedding = parseEmbedding(community.embedding);
-      if (communityEmbedding.length === 0) continue;
-
-      const similarity = cosineSimilarity(queryEmbedding, communityEmbedding);
-
-      results.push({
-        community: {
+        return {
           ...community,
           tags: community.tags.split(",").filter(Boolean),
-        },
-        similarity,
-        reasoning: generateReasoning(query, community, similarity),
-      });
-    }
-
-    // Step 5: Sort by similarity and limit results
-    const sortedResults = results
+          similarity,
+          reasoning: generateReasoning(query, community, similarity),
+        };
+      })
+      .filter((community) => community.similarity > 0.1) // Filter out very low similarity
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
+      .slice(0, 10); // Top 10 results
 
-    // Step 6: Generate suggested filters
-    const suggestedFilters = await generateSuggestedFilters(
-      query,
-      sortedResults
+    // Step 5: Generate suggested filters from top results
+    const suggestedFilters = generateSuggestedFilters(
+      scoredCommunities,
+      interpretation.suggestedFilters
     );
 
     return {
-      results: sortedResults,
-      interpretedQuery,
+      results: scoredCommunities,
+      interpretation: interpretation.interpretedQuery,
       suggestedFilters,
+      query,
     };
   } catch (error) {
     console.error("Error in agentic search:", error);
@@ -88,122 +78,64 @@ export async function agenticSearch(
   }
 }
 
-async function interpretQuery(query: string): Promise<string> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `You are an AI assistant that helps users find Slack communities. 
-          Given a natural language query, interpret it to find relevant Slack communities.
-          Focus on extracting key topics, technologies, interests, and communities mentioned.
-          Return a concise, searchable interpretation of the query.`,
-        },
-        {
-          role: "user",
-          content: `Interpret this query for finding Slack communities: "${query}"`,
-        },
-      ],
-      max_tokens: 100,
-      temperature: 0.3,
-    });
-
-    return response.choices[0]?.message?.content || query;
-  } catch (error) {
-    console.error("Error interpreting query:", error);
-    return query;
-  }
-}
-
 function generateReasoning(
   query: string,
-  community: any,
+  community: CommunityWithEmbedding,
   similarity: number
 ): string {
-  const tags = community.tags.split(",").filter(Boolean);
-  const category = community.category;
+  const queryWords = query.toLowerCase().split(/\s+/);
+  const communityText =
+    `${community.name} ${community.description} ${community.tags}`.toLowerCase();
 
-  let reasoning = `This community (${similarity.toFixed(
-    2
-  )} similarity) matches because:`;
-
-  // Check if query mentions the category
-  if (query.toLowerCase().includes(category.toLowerCase())) {
-    reasoning += `\n- Category "${category}" matches your query`;
-  }
-
-  // Check for tag matches
-  const matchingTags = tags.filter((tag) =>
-    query.toLowerCase().includes(tag.toLowerCase())
+  const matchingTerms = queryWords.filter(
+    (word) => communityText.includes(word) && word.length > 2
   );
 
-  if (matchingTags.length > 0) {
-    reasoning += `\n- Tags "${matchingTags.join(", ")}" are relevant`;
+  if (matchingTerms.length > 0) {
+    return `Matches: ${matchingTerms.join(", ")}`;
   }
 
-  // Check description relevance
-  const descriptionWords = community.description.toLowerCase().split(" ");
-  const queryWords = query.toLowerCase().split(" ");
-  const commonWords = descriptionWords.filter(
-    (word) => queryWords.includes(word) && word.length > 3
-  );
-
-  if (commonWords.length > 0) {
-    reasoning += `\n- Description contains relevant terms: "${commonWords
-      .slice(0, 3)
-      .join(", ")}"`;
+  if (similarity > 0.7) {
+    return "High semantic similarity";
+  } else if (similarity > 0.5) {
+    return "Moderate semantic similarity";
+  } else {
+    return "Low semantic similarity";
   }
-
-  return reasoning;
 }
 
-async function generateSuggestedFilters(
-  query: string,
-  results: SearchResult[]
-): Promise<{ categories: string[]; tags: string[] }> {
-  const categories = new Set<string>();
-  const tags = new Set<string>();
+function generateSuggestedFilters(
+  communities: Array<
+    CommunityWithEmbedding & {
+      tags: string[];
+      similarity: number;
+      reasoning: string;
+    }
+  >,
+  existingFilters: string[]
+): string[] {
+  const allTags = new Set<string>();
+  const allCategories = new Set<string>();
 
-  // Extract categories and tags from top results
-  results.slice(0, 5).forEach((result) => {
-    categories.add(result.community.category);
-    result.community.tags.forEach((tag: string) => tags.add(tag.trim()));
+  communities.forEach((community) => {
+    // Add tags
+    if (community.tags) {
+      community.tags.forEach((tag: string) => allTags.add(tag.trim()));
+    }
+
+    // Add category
+    if (community.category) {
+      allCategories.add(community.category);
+    }
   });
 
-  // Try to extract additional filters from the query using AI
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `Extract potential Slack community categories and tags from the user query.
-          Return only a JSON object with "categories" and "tags" arrays.`,
-        },
-        {
-          role: "user",
-          content: `Query: "${query}"`,
-        },
-      ],
-      max_tokens: 100,
-      temperature: 0.3,
-    });
+  // Combine with existing filters
+  const suggestedFilters = [
+    ...existingFilters,
+    ...Array.from(allTags),
+    ...Array.from(allCategories),
+  ];
 
-    const aiFilters = JSON.parse(response.choices[0]?.message?.content || "{}");
-
-    if (aiFilters.categories) {
-      aiFilters.categories.forEach((cat: string) => categories.add(cat));
-    }
-    if (aiFilters.tags) {
-      aiFilters.tags.forEach((tag: string) => tags.add(tag));
-    }
-  } catch (error) {
-    console.error("Error generating AI filters:", error);
-  }
-
-  return {
-    categories: Array.from(categories),
-    tags: Array.from(tags),
-  };
+  // Remove duplicates and limit to top 10
+  return [...new Set(suggestedFilters)].slice(0, 10);
 }

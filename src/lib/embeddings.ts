@@ -9,10 +9,18 @@ export interface EmbeddingResult {
   text: string;
 }
 
+// Rate limiting helper
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function generateEmbedding(
   text: string
 ): Promise<EmbeddingResult> {
   try {
+    // Add a small delay to prevent rate limiting
+    await delay(100);
+
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: text,
@@ -23,8 +31,34 @@ export async function generateEmbedding(
       embedding: response.data[0].embedding,
       text: text,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error generating embedding:", error);
+
+    const errorObj = error as { code?: string; status?: number };
+    if (errorObj.code === "insufficient_quota" || errorObj.status === 429) {
+      console.log("Rate limit hit. Waiting 5 seconds before retry...");
+      await delay(5000);
+
+      // Try one more time
+      try {
+        const response = await openai.embeddings.create({
+          model: "text-embedding-3-small",
+          input: text,
+          encoding_format: "float",
+        });
+
+        return {
+          embedding: response.data[0].embedding,
+          text: text,
+        };
+      } catch (retryError) {
+        console.error("Retry also failed:", retryError);
+        throw new Error(
+          "OpenAI quota exceeded. Please check your billing settings."
+        );
+      }
+    }
+
     throw new Error("Failed to generate embedding");
   }
 }
@@ -49,21 +83,13 @@ export function cosineSimilarity(a: number[], b: number[]): number {
     normB += b[i] * b[i];
   }
 
-  normA = Math.sqrt(normA);
-  normB = Math.sqrt(normB);
-
-  if (normA === 0 || normB === 0) {
-    return 0;
-  }
-
-  return dotProduct / (normA * normB);
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 export function parseEmbedding(embeddingString: string): number[] {
   try {
     return JSON.parse(embeddingString);
-  } catch (error) {
-    console.error("Error parsing embedding:", error);
+  } catch {
     return [];
   }
 }

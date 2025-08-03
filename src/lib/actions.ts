@@ -1,8 +1,14 @@
 "use server";
 
 import { prisma } from "./db";
+import { generateEmbedding, stringifyEmbedding } from "./free-ai";
+import {
+  scrapeCommunityPage,
+  scrapeCommunityDirectory,
+  validateUrl,
+  sanitizeUrl,
+} from "./scraper";
 import { revalidatePath } from "next/cache";
-import { scrapeCommunityPage, validateUrl, sanitizeUrl } from "./scraper";
 
 export type CommunityFormData = {
   name: string;
@@ -17,6 +23,11 @@ export type CommunityFormData = {
 
 export async function addCommunity(data: CommunityFormData) {
   try {
+    const embeddingText = `${data.name} ${data.description} ${data.tags.join(
+      " "
+    )}`;
+    const embedding = await generateEmbedding(embeddingText);
+
     const community = await prisma.slackCommunity.create({
       data: {
         name: data.name,
@@ -26,6 +37,8 @@ export async function addCommunity(data: CommunityFormData) {
         inviteUrl: data.inviteUrl,
         website: data.website,
         logoUrl: data.logoUrl,
+        sourcePage: data.sourcePage,
+        embedding: stringifyEmbedding(embedding.embedding),
       },
     });
 
@@ -39,12 +52,69 @@ export async function addCommunity(data: CommunityFormData) {
 
 export async function scrapeAndAddCommunity(url: string) {
   try {
-    if (!validateUrl(url)) {
+    // Clean the URL first
+    const cleanUrl = url.trim().replace(/\s+/g, "");
+
+    if (!validateUrl(cleanUrl)) {
       return { success: false, error: "Invalid URL provided" };
     }
 
-    const sanitizedUrl = sanitizeUrl(url);
+    const sanitizedUrl = sanitizeUrl(cleanUrl);
+
+    // Try to scrape as a directory first
+    try {
+      const communities = await scrapeCommunityDirectory(sanitizedUrl);
+
+      if (communities.length > 0) {
+        // Add all found communities
+        const addedCommunities = [];
+
+        for (const scrapedData of communities) {
+          try {
+            const embeddingText = `${scrapedData.name} ${
+              scrapedData.description
+            } ${scrapedData.tags.join(" ")}`;
+            const embedding = await generateEmbedding(embeddingText);
+
+            const community = await prisma.slackCommunity.create({
+              data: {
+                name: scrapedData.name,
+                description: scrapedData.description,
+                tags: scrapedData.tags.join(","),
+                category: "Technology", // Default category
+                inviteUrl: scrapedData.inviteUrl || "",
+                website: scrapedData.website,
+                logoUrl: scrapedData.logoUrl,
+                sourcePage: scrapedData.sourcePage,
+                embedding: stringifyEmbedding(embedding.embedding),
+              },
+            });
+
+            addedCommunities.push(community);
+          } catch (error) {
+            console.error(`Error adding community ${scrapedData.name}:`, error);
+          }
+        }
+
+        revalidatePath("/");
+        return {
+          success: true,
+          data: addedCommunities,
+          message: `Successfully scraped and added ${addedCommunities.length} communities`,
+        };
+      }
+    } catch (error) {
+      console.log("Directory scraping failed, trying single page scraping");
+    }
+
+    // Fallback to single page scraping
     const scrapedData = await scrapeCommunityPage(sanitizedUrl);
+
+    // Generate embedding for the scraped community
+    const embeddingText = `${scrapedData.name} ${
+      scrapedData.description
+    } ${scrapedData.tags.join(" ")}`;
+    const embedding = await generateEmbedding(embeddingText);
 
     const community = await prisma.slackCommunity.create({
       data: {
@@ -55,6 +125,8 @@ export async function scrapeAndAddCommunity(url: string) {
         inviteUrl: scrapedData.inviteUrl || "",
         website: scrapedData.website,
         logoUrl: scrapedData.logoUrl,
+        sourcePage: scrapedData.sourcePage,
+        embedding: stringifyEmbedding(embedding.embedding),
       },
     });
 
@@ -107,24 +179,10 @@ export async function getCommunities(
   }
 }
 
-// Placeholder for agentic search - will be implemented when OpenAI is available
 export async function agenticSearchCommunities(query: string) {
   try {
-    // For now, just do a simple text search
-    const communities = await getCommunities(query);
-
-    return {
-      results: communities.map((community) => ({
-        community,
-        similarity: 0.8, // Placeholder
-        reasoning: `Matched "${query}" in community data`,
-      })),
-      interpretedQuery: query,
-      suggestedFilters: {
-        categories: [],
-        tags: [],
-      },
-    };
+    const { agenticSearch } = await import("./agentic-search");
+    return await agenticSearch(query);
   } catch (error) {
     console.error("Error in agentic search:", error);
     throw new Error("Failed to perform agentic search");
@@ -155,7 +213,6 @@ export async function getCategories() {
       select: { category: true },
       distinct: ["category"],
     });
-
     return categories.map((c) => c.category);
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -169,14 +226,50 @@ export async function getAllTags() {
       select: { tags: true },
     });
 
-    const allTags = communities
-      .flatMap((c) => c.tags.split(","))
-      .filter(Boolean)
-      .map((tag) => tag.trim());
+    const allTags = new Set<string>();
+    communities.forEach((community) => {
+      const tags = community.tags.split(",").filter(Boolean);
+      tags.forEach((tag) => allTags.add(tag.trim()));
+    });
 
-    return [...new Set(allTags)];
+    return Array.from(allTags);
   } catch (error) {
     console.error("Error fetching tags:", error);
     return [];
+  }
+}
+
+export async function generateEmbeddingsForExistingCommunities() {
+  try {
+    const communities = await prisma.slackCommunity.findMany({
+      where: { embedding: null },
+    });
+
+    for (const community of communities) {
+      try {
+        const embeddingText = `${community.name} ${community.description} ${community.tags}`;
+        const embedding = await generateEmbedding(embeddingText);
+
+        await prisma.slackCommunity.update({
+          where: { id: community.id },
+          data: { embedding: stringifyEmbedding(embedding.embedding) },
+        });
+
+        console.log(`Updated embeddings for: ${community.name}`);
+      } catch (error) {
+        console.error(
+          `Error updating embeddings for ${community.name}:`,
+          error
+        );
+      }
+    }
+
+    return {
+      success: true,
+      message: `Updated embeddings for ${communities.length} communities`,
+    };
+  } catch (error) {
+    console.error("Error generating embeddings:", error);
+    return { success: false, error: "Failed to generate embeddings" };
   }
 }
