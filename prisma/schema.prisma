@@ -6,21 +6,76 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model SlackCommunity {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  tags        String   // Comma-separated tags
-  category    String
-  inviteUrl   String
-  website     String?
-  logoUrl     String?
-  sourcePage  String?  // Original page crawled (if applicable)
-  embedding   String?  // JSON string of embedding vector
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  created_at    DateTime  @default(now())
+  signup_source String?   // e.g., "organic", "referral", "paid"
+  
+  // Relations
+  payments      Payment[]
+  sessions      Session[]
+  referrals     Referral[] @relation("Referrer")
+  referred      Referral[] @relation("Referred")
+  
+  @@map("users")
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  user_id    String
+  amount     Decimal  @db.Decimal(10, 2)
+  created_at DateTime @default(now())
+  status     String   // e.g., "completed", "pending", "failed"
+  
+  // Relations
+  user       User     @relation(fields: [user_id], references: [id])
+  
+  @@map("payments")
+}
+
+model Session {
+  id               String   @id @default(cuid())
+  user_id          String
+  duration_minutes Int
+  created_at       DateTime @default(now())
+  referrer         String?  // e.g., "google", "direct", "social"
+  
+  // Relations
+  user             User     @relation(fields: [user_id], references: [id])
+  
+  @@map("sessions")
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrer_id String
+  referred_id String
+  created_at  DateTime @default(now())
+  status      String   // e.g., "pending", "completed", "expired"
+  
+  // Relations
+  referrer    User     @relation("Referrer", fields: [referrer_id], references: [id])
+  referred    User     @relation("Referred", fields: [referred_id], references: [id])
+  
+  @@map("referrals")
+}
+
+model QueryLog {
+  id            String   @id @default(cuid())
+  timestamp     DateTime @default(now())
+  user          String
+  channel       String
+  originalQuery String
+  generatedSQL  String
+  result        Json?
+  error         String?
+  executionTime Int      // in milliseconds
+  
+  @@map("query_logs")
 }

@@ -1,132 +1,184 @@
 import { PrismaClient } from "@prisma/client";
-import { generateEmbedding, stringifyEmbedding } from "../src/lib/free-ai";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const sampleCommunities = [
-    {
-      name: "AI Agents & Automation",
-      description:
-        "A community for developers and researchers working on AI agents, automation, and intelligent systems. Share knowledge about LLMs, RAG, and agent architectures.",
-      tags: "ai,agents,automation,llm,rag,research",
-      category: "Technology",
-      inviteUrl: "https://slack.com/invite/ai-agents",
-      website: "https://aiagents.com",
-      logoUrl: "https://via.placeholder.com/150/6366F1/FFFFFF?text=AI",
-    },
-    {
-      name: "LangChain Developers",
-      description:
-        "Connect with developers building applications using LangChain. Share code, discuss best practices, and get help with your LangChain projects.",
-      tags: "langchain,python,llm,development,ai",
-      category: "Technology",
-      inviteUrl: "https://slack.com/invite/langchain-dev",
-      website: "https://langchain.com",
-      logoUrl: "https://via.placeholder.com/150/10B981/FFFFFF?text=LC",
-    },
-    {
-      name: "Retrieval-Augmented Generation",
-      description:
-        "Deep dive into RAG systems, vector databases, and semantic search. Learn about embeddings, chunking strategies, and evaluation methods.",
-      tags: "rag,embeddings,vector-search,semantic-search,ai",
-      category: "Technology",
-      inviteUrl: "https://slack.com/invite/rag-community",
-      website: "https://ragcommunity.org",
-    },
-    {
-      name: "Startup Founders Network",
-      description:
-        "A community for startup founders to network, share experiences, and get advice from fellow entrepreneurs. Discuss fundraising, growth, and challenges.",
-      tags: "startup,entrepreneurship,business,networking,funding",
-      category: "Business",
-      inviteUrl: "https://slack.com/invite/startup-founders",
-      website: "https://startupfounders.com",
-    },
-    {
-      name: "Product Management",
-      description:
-        "For product managers to discuss strategy, tools, methodologies, and career development. Share insights on user research, roadmapping, and team collaboration.",
-      tags: "product-management,strategy,user-research,roadmap,leadership",
-      category: "Business",
-      inviteUrl: "https://slack.com/invite/product-management",
-      website: "https://productmanagement.com",
-    },
-    {
-      name: "Machine Learning Engineers",
-      description:
-        "Connect with ML engineers working on production systems. Discuss MLOps, model deployment, monitoring, and scaling ML infrastructure.",
-      tags: "mlops,machine-learning,engineering,deployment,monitoring",
-      category: "Technology",
-      inviteUrl: "https://slack.com/invite/ml-engineers",
-      website: "https://mlengineers.org",
-    },
-    {
-      name: "Design Systems",
-      description:
-        "Connect with designers and developers building scalable design systems. Share tools, techniques, and best practices for component libraries.",
-      tags: "design,design-systems,ui,ux,components",
-      category: "Design",
-      inviteUrl: "https://slack.com/invite/design-systems",
-      website: "https://designsystems.com",
-      logoUrl: "https://via.placeholder.com/150/6366F1/FFFFFF?text=DS",
-    },
-    {
-      name: "Web3 & Blockchain",
-      description:
-        "Explore the future of the web with blockchain technology, DeFi, NFTs, and decentralized applications. Connect with builders and enthusiasts.",
-      tags: "web3,blockchain,crypto,defi,nft",
-      category: "Technology",
-      inviteUrl: "https://slack.com/invite/web3-blockchain",
-      website: "https://web3community.org",
-    },
-    {
-      name: "Remote Work Community",
-      description:
-        "Connect with remote workers worldwide. Share tips, tools, and experiences for successful remote work and work-life balance.",
-      tags: "remote-work,productivity,work-life-balance,distributed-teams",
-      category: "Business",
-      inviteUrl: "https://slack.com/invite/remote-work",
-      website: "https://remotework.com",
-    },
-    {
-      name: "Digital Marketing",
-      description:
-        "Learn and share digital marketing strategies, tools, and trends. From SEO to social media marketing, growth hacking to content strategy.",
-      tags: "marketing,seo,social-media,digital,growth-hacking",
-      category: "Marketing",
-      inviteUrl: "https://slack.com/invite/digital-marketing",
-      website: "https://digitalmarketing.com",
-    },
-  ];
+  console.log("🌱 Seeding database...");
 
-  console.log("Seeding database...");
+  // Create sample users
+  const users = await Promise.all([
+    prisma.user.create({
+      data: {
+        name: "Alice Johnson",
+        email: "alice@example.com",
+        signup_source: "organic",
+        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+      },
+    }),
+    prisma.user.create({
+      data: {
+        name: "Bob Smith",
+        email: "bob@example.com",
+        signup_source: "referral",
+        created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
+      },
+    }),
+    prisma.user.create({
+      data: {
+        name: "Carol Davis",
+        email: "carol@example.com",
+        signup_source: "paid",
+        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      },
+    }),
+    prisma.user.create({
+      data: {
+        name: "David Wilson",
+        email: "david@example.com",
+        signup_source: "organic",
+        created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      },
+    }),
+    prisma.user.create({
+      data: {
+        name: "Eva Brown",
+        email: "eva@example.com",
+        signup_source: "referral",
+        created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      },
+    }),
+  ]);
 
-  for (const community of sampleCommunities) {
-    try {
-      // Generate embedding for the community
-      const embeddingText = `${community.name} ${community.description} ${community.tags}`;
-      const embedding = await generateEmbedding(embeddingText);
+  console.log(`✅ Created ${users.length} users`);
 
-      await prisma.slackCommunity.create({
-        data: {
-          ...community,
-          embedding: stringifyEmbedding(embedding.embedding),
-        },
-      });
+  // Create sample payments
+  const payments = await Promise.all([
+    prisma.payment.create({
+      data: {
+        user_id: users[0].id,
+        amount: 99.99,
+        status: "completed",
+        created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        user_id: users[1].id,
+        amount: 149.99,
+        status: "completed",
+        created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        user_id: users[2].id,
+        amount: 79.99,
+        status: "completed",
+        created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        user_id: users[3].id,
+        amount: 199.99,
+        status: "completed",
+        created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.payment.create({
+      data: {
+        user_id: users[4].id,
+        amount: 59.99,
+        status: "pending",
+        created_at: new Date(),
+      },
+    }),
+  ]);
 
-      console.log(`Added: ${community.name}`);
-    } catch (error) {
-      console.error(`Error adding ${community.name}:`, error);
-    }
-  }
+  console.log(`✅ Created ${payments.length} payments`);
 
-  console.log("Database seeded successfully!");
+  // Create sample sessions
+  const sessions = await Promise.all([
+    prisma.session.create({
+      data: {
+        user_id: users[0].id,
+        duration_minutes: 45,
+        referrer: "google",
+        created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.session.create({
+      data: {
+        user_id: users[1].id,
+        duration_minutes: 120,
+        referrer: "direct",
+        created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.session.create({
+      data: {
+        user_id: users[2].id,
+        duration_minutes: 30,
+        referrer: "social",
+        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.session.create({
+      data: {
+        user_id: users[3].id,
+        duration_minutes: 90,
+        referrer: "google",
+        created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.session.create({
+      data: {
+        user_id: users[4].id,
+        duration_minutes: 60,
+        referrer: "direct",
+        created_at: new Date(),
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${sessions.length} sessions`);
+
+  // Create sample referrals
+  const referrals = await Promise.all([
+    prisma.referral.create({
+      data: {
+        referrer_id: users[0].id,
+        referred_id: users[1].id,
+        status: "completed",
+        created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.referral.create({
+      data: {
+        referrer_id: users[2].id,
+        referred_id: users[3].id,
+        status: "pending",
+        created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.referral.create({
+      data: {
+        referrer_id: users[1].id,
+        referred_id: users[4].id,
+        status: "completed",
+        created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    }),
+  ]);
+
+  console.log(`✅ Created ${referrals.length} referrals`);
+
+  console.log("🎉 Database seeded successfully!");
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error("❌ Error seeding database:", e);
     process.exit(1);
   })
   .finally(async () => {

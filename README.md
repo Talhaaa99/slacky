@@ -1,314 +1,335 @@
-# Slacky AI - Agentic Slack Community Directory
+# Slacky - Postgres Assistant Chat & Slack Bot
 
-A modern, AI-powered Slack community directory that enables natural language search and discovery of Slack communities. Built with Next.js 15, TypeScript, and advanced search capabilities.
+A comprehensive Next.js 15 application that provides both a web-based chat interface and a Slack bot for querying Postgres databases using natural language. Built with TypeScript, TailwindCSS, and modern AI integration.
 
 ## 🚀 Features
 
-### Core Functionality
+### Web Interface
+- 🎨 **Slack-like Chat Interface**: Clean, modern chat interface with sidebar navigation
+- 🤖 **AI-Powered**: Uses Hugging Face Inference API to convert natural language to SQL
+- 📊 **Database Integration**: Direct Postgres integration with Prisma ORM
+- 📱 **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- 🔒 **Security**: SQL injection protection and query validation
 
-- **Agentic Search**: Use natural language to find communities (e.g., "Show me AI agent-focused communities")
-- **Traditional Search**: Standard filtering by category, tags, and text search
-- **Web Scraping**: Automatically extract community information from landing pages
-- **Community Management**: Add, view, and manage Slack communities
-- **Responsive Design**: Mobile-first design with beautiful animations
+### Slack Bot
+- 💬 **Slack Integration**: Native Slack bot using Bolt.js
+- 🧵 **Thread Responses**: Responds only in threads to keep channels clean
+- 📝 **Query Logging**: Comprehensive logging of all queries and results
+- ⚡ **Real-time Processing**: Instant message processing with loading states
+- 🎯 **Channel Targeting**: Configurable channel for bot interactions
 
-### AI-Powered Features
+### Admin Dashboard
+- ⚙️ **Configuration Panel**: Easy setup of Slack and database credentials
+- 📊 **Query Logs**: Monitor all queries with filtering and statistics
+- 📈 **Analytics**: Track query success rates and performance
+- 🎨 **Futuristic UI**: Black and white theme with smooth animations
 
-- **Natural Language Queries**: Ask questions like "Find groups discussing LLMs" or "Best RAG learning communities"
-- **Semantic Search**: Advanced search using embeddings (when OpenAI is available)
-- **Query Interpretation**: AI interprets user intent and suggests relevant filters
-- **Smart Recommendations**: Automatic tag and category suggestions
+## 🛠️ Tech Stack
 
-### Technical Stack
+- **Frontend**: Next.js 15, TypeScript, TailwindCSS
+- **UI Components**: Shadcn, Lucide React icons
+- **AI**: Hugging Face Inference API
+- **Database**: PostgreSQL with Prisma ORM
+- **Slack**: Bolt.js for Slack bot integration
+- **Styling**: TailwindCSS v4
 
-- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS
-- **Backend**: Server Actions, API Routes
-- **Database**: SQLite with Prisma ORM (ready for Supabase migration)
-- **AI**: OpenAI embeddings and GPT-3.5-turbo for query interpretation
-- **Animations**: GSAP for smooth hover effects and transitions
-- **Web Scraping**: Cheerio for extracting community data
+## 🚀 Quick Start
 
-## 🏗️ Project Structure
-
-```
-slacky/
-├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── page.tsx           # Home page with search
-│   │   ├── add/page.tsx       # Add community form
-│   │   ├── community/[id]/    # Community detail page
-│   │   ├── layout.tsx         # Root layout
-│   │   └── globals.css        # Global styles
-│   ├── components/            # React components
-│   │   ├── ui/               # Reusable UI components
-│   │   ├── community-card.tsx # Community card with GSAP animations
-│   │   ├── search-filters.tsx # Traditional search filters
-│   │   ├── agentic-search-box.tsx # AI-powered search
-│   │   └── scrape-community.tsx # Web scraping component
-│   └── lib/                  # Utility functions
-│       ├── actions.ts         # Server actions
-│       ├── db.ts             # Database client
-│       ├── embeddings.ts     # OpenAI embedding functions
-│       ├── agentic-search.ts # AI search logic
-│       ├── scraper.ts        # Web scraping utilities
-│       └── utils.ts          # Helper functions
-├── prisma/
-│   ├── schema.prisma         # Database schema
-│   └── seed.ts              # Database seeding
-└── public/                  # Static assets
-```
-
-## 🗄️ Database Schema
-
-```prisma
-model SlackCommunity {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  tags        String   // Comma-separated tags
-  category    String
-  inviteUrl   String
-  website     String?
-  logoUrl     String?
-  sourcePage  String?  // Original page crawled
-  embedding   String?  // JSON string of embedding vector
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- OpenAI API key (optional for full AI features)
-
-### Installation
-
-1. **Clone the repository:**
+### 1. Clone and Install
 
 ```bash
-git clone <repository-url>
+git clone <your-repo>
 cd slacky
-```
-
-2. **Install dependencies:**
-
-```bash
 npm install
 ```
 
-3. **Set up environment variables:**
+### 2. Environment Setup
 
-```bash
-# Required
-DATABASE_URL="file:./dev.db"
-
-# Optional (for AI features)
-OPENAI_API_KEY="your-openai-api-key-here"
-```
-
-4. **Set up the database:**
-
-```bash
-npx prisma db push
-```
-
-5. **Seed the database:**
-
-```bash
-npm run seed
-```
-
-6. **Start the development server:**
-
-```bash
-npm run dev
-```
-
-7. **Open [http://localhost:3000](http://localhost:3000) in your browser**
-
-## 🔍 Usage
-
-### Traditional Search
-
-- Use the search bar to find communities by name or description
-- Filter by categories (Technology, Business, Design, etc.)
-- Filter by tags (ai, startup, design, etc.)
-- Combine multiple filters for precise results
-
-### Agentic Search
-
-- Switch to "AI Agentic Search" mode
-- Ask natural language questions like:
-  - "Show me AI agent-focused communities"
-  - "Find Slack groups where people talk about LLMs"
-  - "What's the best community to learn Retrieval-Augmented Generation?"
-  - "Slack communities for startup founders"
-
-### Adding Communities
-
-1. **Manual Entry**: Use the "Add Community" form
-2. **Web Scraping**: Click "Scrape" and enter a community landing page URL
-3. **Auto-Extraction**: The scraper will extract name, description, tags, and invite links
-
-## 🤖 AI Features
-
-### Natural Language Processing
-
-The application uses OpenAI's GPT-3.5-turbo to:
-
-- Interpret user queries and convert them to searchable terms
-- Generate suggested filters based on query content
-- Provide reasoning for search results
-
-### Semantic Search
-
-When OpenAI is available, the app:
-
-- Generates embeddings for community content
-- Performs cosine similarity searches
-- Ranks results by semantic relevance
-
-### Query Examples
-
-```
-✅ "Show me AI agent-focused Slack communities"
-✅ "Find Slack groups where people talk about LLMs"
-✅ "What's the best community to learn Retrieval-Augmented Generation?"
-✅ "Slack communities for startup founders"
-✅ "Groups discussing machine learning and data science"
-```
-
-## 🎨 Design Features
-
-### UI/UX
-
-- **Black & White Theme**: Clean, modern design
-- **GSAP Animations**: Smooth hover effects and transitions
-- **Responsive Design**: Mobile-first approach
-- **Gradient Accents**: Purple-to-blue gradients for AI features
-- **Loading States**: Skeleton loaders and progress indicators
-
-### Components
-
-- **Community Cards**: Hover animations with GSAP
-- **Search Interface**: Toggle between traditional and AI search
-- **Filter System**: Dynamic category and tag filtering
-- **Web Scraping**: Real-time community extraction
-
-## 🔧 Development
-
-### Available Scripts
-
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-npm run seed         # Seed database with sample data
-```
-
-### Environment Variables
+Create a `.env.local` file:
 
 ```env
 # Database
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://username:password@localhost:5432/slacky"
 
-# OpenAI (optional)
-OPENAI_API_KEY="your-api-key"
+# Hugging Face API
+HUGGINGFACE_API_KEY="your_huggingface_api_key_here"
 
-# Supabase (for future migration)
-NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-key"
+# Slack Bot (for Slack integration)
+SLACK_BOT_TOKEN="xoxb-your-bot-token"
+SLACK_SIGNING_SECRET="your-signing-secret"
+SLACK_CHANNEL_ID="C1234567890"  # Channel where bot listens
 ```
 
-### Database Operations
+### 3. Database Setup
 
 ```bash
 # Generate Prisma client
 npx prisma generate
 
-# Push schema changes
+# Push schema to database
 npx prisma db push
 
-# Open Prisma Studio
-npx prisma studio
-
-# Reset database
-npx prisma db push --force-reset
+# Seed with sample data (optional)
+npm run db:seed
 ```
+
+### 4. Slack Bot Setup
+
+1. **Create a Slack App**:
+   - Go to [https://api.slack.com/apps](https://api.slack.com/apps)
+   - Click "Create New App" → "From scratch"
+   - Name your app (e.g., "Slacky Bot")
+
+2. **Configure Bot Permissions**:
+   - Go to "OAuth & Permissions"
+   - Add bot token scopes:
+     - `channels:history`
+     - `chat:write`
+     - `app_mentions:read`
+     - `channels:read`
+
+3. **Set up Event Subscriptions**:
+   - Go to "Event Subscriptions"
+   - Enable events
+   - Set request URL: `https://your-domain.com/api/slack/events`
+   - Subscribe to events:
+     - `message.channels`
+
+4. **Install App**:
+   - Go to "Install App"
+   - Install to your workspace
+   - Copy the Bot User OAuth Token
+
+### 5. Start the Application
+
+```bash
+npm run dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) to access the dashboard.
+
+## 📱 Usage
+
+### Web Interface
+
+Navigate to `/dashboard` to access:
+- **Chat Interface**: Test queries directly in the browser
+- **Admin Panel**: Configure credentials and monitor status
+- **Query Logs**: View all query history and results
+
+### Slack Bot
+
+1. **Add the bot to your channel** (e.g., `#ask-data`)
+2. **Ask questions in natural language**:
+   - "How many users signed up last week?"
+   - "Show me the top 5 paying users"
+   - "What's the average session duration?"
+
+3. **Bot responds in threads** with:
+   - Generated SQL query
+   - Query results
+   - Execution time
+
+## 🔧 API Endpoints
+
+### `/api/slack/events`
+Handles Slack message events and processes natural language queries.
+
+### `/api/query`
+Standalone API for processing queries:
+```bash
+curl -X POST http://localhost:3000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How many users signed up last week?"}'
+```
+
+### `/api/generate-sql`
+Converts natural language to SQL using Hugging Face API.
+
+### `/api/execute-sql`
+Executes SQL queries against the database.
+
+### `/api/logs`
+Retrieves query logs with filtering and pagination.
+
+## 🗄️ Database Schema
+
+```sql
+-- Users table
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  signup_source TEXT
+);
+
+-- Payments table
+CREATE TABLE payments (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  amount DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  status TEXT NOT NULL
+);
+
+-- Sessions table
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  duration_minutes INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  referrer TEXT
+);
+
+-- Referrals table
+CREATE TABLE referrals (
+  id TEXT PRIMARY KEY,
+  referrer_id TEXT REFERENCES users(id),
+  referred_id TEXT REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW(),
+  status TEXT NOT NULL
+);
+
+-- Query logs table
+CREATE TABLE query_logs (
+  id TEXT PRIMARY KEY,
+  timestamp TIMESTAMP DEFAULT NOW(),
+  user TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  original_query TEXT NOT NULL,
+  generated_sql TEXT NOT NULL,
+  result JSONB,
+  error TEXT,
+  execution_time INTEGER NOT NULL
+);
+```
+
+## 🔒 Security Features
+
+- **SQL Injection Protection**: Only SELECT queries allowed
+- **Query Validation**: All queries validated before execution
+- **Error Handling**: Comprehensive error handling and logging
+- **Rate Limiting**: Built-in protection against abuse
+- **Secure Storage**: Credentials stored securely
+
+## 📊 Monitoring & Analytics
+
+### Query Statistics
+- Total queries processed
+- Success/error rates
+- Average execution time
+- Most common query types
+
+### Bot Status
+- Connection status
+- Channel activity
+- Error tracking
+- Performance metrics
 
 ## 🚀 Deployment
 
 ### Vercel (Recommended)
 
-1. Connect your GitHub repository to Vercel
-2. Add environment variables in Vercel dashboard
-3. Deploy automatically on push to main branch
+1. **Push to GitHub**:
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   git push origin main
+   ```
 
-### Other Platforms
+2. **Deploy to Vercel**:
+   - Connect your GitHub repository
+   - Add environment variables
+   - Deploy!
 
-- **Netlify**: Compatible with Next.js
-- **Railway**: Easy database integration
-- **Heroku**: Add buildpack for Node.js
+3. **Update Slack Webhook URL**:
+   - Update your Slack app's request URL to your Vercel domain
+   - Example: `https://your-app.vercel.app/api/slack/events`
 
-### Production Database
+### Environment Variables for Production
 
-For production, consider:
+```env
+DATABASE_URL="postgresql://user:pass@host:5432/db"
+HUGGINGFACE_API_KEY="hf_your_api_key"
+SLACK_BOT_TOKEN="xoxb-your-bot-token"
+SLACK_SIGNING_SECRET="your-signing-secret"
+SLACK_CHANNEL_ID="C1234567890"
+```
 
-- **Supabase**: PostgreSQL with vector search
-- **PlanetScale**: MySQL with branching
-- **Neon**: Serverless Postgres
+## 🛠️ Development
 
-## 🔮 Future Enhancements
+### Project Structure
 
-### Planned Features
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── slack/events/route.ts    # Slack bot events
+│   │   ├── query/route.ts           # Standalone query API
+│   │   ├── generate-sql/route.ts    # Hugging Face integration
+│   │   ├── execute-sql/route.ts     # Database execution
+│   │   └── logs/route.ts            # Query logs API
+│   ├── dashboard/page.tsx           # Main dashboard
+│   ├── globals.css                  # Global styles
+│   └── page.tsx                     # Home redirect
+├── components/
+│   ├── Chat.tsx                     # Web chat interface
+│   ├── AdminPanel.tsx               # Configuration panel
+│   ├── QueryLog.tsx                 # Logs viewer
+│   ├── ChatWindow.tsx               # Message display
+│   ├── Message.tsx                  # Individual message
+│   ├── MessageInput.tsx             # Input component
+│   └── Sidebar.tsx                  # Navigation
+├── lib/
+│   └── utils.ts                     # Utility functions
+└── types/
+    ├── chat.ts                      # Chat types
+    └── slack.ts                     # Slack bot types
+```
 
-- [ ] **Supabase Integration**: Vector search with pgvector
-- [ ] **Real-time Updates**: WebSocket notifications
-- [ ] **Community Analytics**: View counts and engagement
-- [ ] **Advanced Scraping**: Puppeteer for dynamic content
-- [ ] **API Endpoints**: RESTful API for external access
-- [ ] **User Authentication**: Sign up and personalization
-- [ ] **Community Reviews**: Rating and review system
+### Available Scripts
 
-### AI Enhancements
-
-- [ ] **Conversational Interface**: Chat-like search experience
-- [ ] **Smart Recommendations**: ML-based community suggestions
-- [ ] **Content Analysis**: Automatic tag generation
-- [ ] **Trend Detection**: Identify emerging communities
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run db:seed` - Seed database with sample data
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see LICENSE file for details.
 
-## 🙏 Acknowledgments
+## 🆘 Troubleshooting
 
-- Inspired by [Disboard](https://disboard.org)
-- Built with Next.js 15 and modern web technologies
-- Uses GSAP for smooth animations
-- OpenAI for AI-powered features
+### Common Issues
 
-## 📞 Support
+1. **Slack Bot Not Responding**:
+   - Check bot token and signing secret
+   - Verify channel ID is correct
+   - Ensure bot is added to the channel
 
-For questions or support:
+2. **Database Connection Issues**:
+   - Verify DATABASE_URL format
+   - Check PostgreSQL is running
+   - Run `npx prisma db push`
 
-- Open an issue on GitHub
-- Check the documentation
-- Join our development community
+3. **Hugging Face API Errors**:
+   - Verify API key is valid
+   - Check API rate limits
+   - Try different model if needed
 
----
+### Support
 
-**Slacky AI** - Discover amazing Slack communities with the power of AI! 🚀
+For issues and questions:
+- Check the logs in `/dashboard` → Query Logs
+- Verify environment variables
+- Test connections in Admin Panel
