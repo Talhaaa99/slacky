@@ -1,13 +1,19 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Chat from '@/components/Chat';
-import AdminPanel from '@/components/AdminPanel';
-import QueryLog from '@/components/QueryLog';
-import { Settings, Database, MessageSquare, Home, Sparkles } from 'lucide-react';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Chat from "@/components/Chat";
+import AdminPanel from "@/components/AdminPanel";
+import QueryLog from "@/components/QueryLog";
+import {
+  Settings,
+  Database,
+  MessageSquare,
+  Home,
+  Sparkles,
+} from "lucide-react";
 
-type View = 'chat' | 'admin' | 'logs';
+type View = "chat" | "admin" | "logs";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -15,9 +21,9 @@ const containerVariants = {
     opacity: 1,
     transition: {
       duration: 0.5,
-      staggerChildren: 0.1
-    }
-  }
+      staggerChildren: 0.1,
+    },
+  },
 };
 
 const itemVariants = {
@@ -27,53 +33,55 @@ const itemVariants = {
     opacity: 1,
     transition: {
       duration: 0.5,
-      ease: "easeOut"
-    }
-  }
+    },
+  },
 };
 
 const navItemVariants = {
   rest: { scale: 1 },
-  hover: { 
+  hover: {
     scale: 1.05,
-    transition: { duration: 0.2, ease: "easeInOut" }
+    transition: { duration: 0.2 },
   },
-  tap: { scale: 0.95 }
+  tap: { scale: 0.95 },
 };
 
 export default function Dashboard() {
-  const [currentView, setCurrentView] = useState<View>('chat');
+  const [currentView, setCurrentView] = useState<View>("chat");
 
   const navigation = [
-    { id: 'chat', name: 'Chat Interface', icon: MessageSquare, color: 'from-blue-500 to-purple-600' },
-    { id: 'admin', name: 'Admin Panel', icon: Settings, color: 'from-green-500 to-teal-600' },
-    { id: 'logs', name: 'Query Logs', icon: Database, color: 'from-orange-500 to-red-600' },
+    {
+      id: "chat",
+      name: "Chat Interface",
+      icon: MessageSquare,
+      color: "from-blue-500 to-purple-600",
+    },
+    {
+      id: "admin",
+      name: "Admin Panel",
+      icon: Settings,
+      color: "from-green-500 to-teal-600",
+    },
+    {
+      id: "logs",
+      name: "Query Logs",
+      icon: Database,
+      color: "from-orange-500 to-red-600",
+    },
   ];
 
   return (
-    <motion.div 
-      className="min-h-screen bg-black text-white overflow-hidden"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Animated Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(120,119,198,0.05),transparent_50%)]" />
-      </div>
-
-      {/* Navigation */}
-      <motion.nav 
-        className="relative z-10 bg-black/80 backdrop-blur-xl border-b border-gray-800/50"
+    <div className="min-h-screen bg-black text-white flex flex-col">
+      {/* Fixed Top Navigation */}
+      <motion.nav
+        className="bg-black/90 backdrop-blur-xl border-b border-gray-800/50 sticky top-0 z-50 flex-shrink-0"
         variants={itemVariants}
+        initial="hidden"
+        animate="visible"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <motion.div 
-              className="flex items-center"
-              variants={itemVariants}
-            >
+            <motion.div className="flex items-center" variants={itemVariants}>
               <div className="relative">
                 <Home className="w-8 h-8 text-white mr-3" />
                 <motion.div
@@ -88,14 +96,11 @@ export default function Dashboard() {
               <Sparkles className="w-5 h-5 ml-2 text-purple-400" />
             </motion.div>
 
-            <motion.div 
-              className="flex space-x-2"
-              variants={itemVariants}
-            >
+            <motion.div className="flex space-x-2" variants={itemVariants}>
               {navigation.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = currentView === item.id;
-                
+
                 return (
                   <motion.button
                     key={item.id}
@@ -103,7 +108,7 @@ export default function Dashboard() {
                     className={`relative flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                       isActive
                         ? `bg-gradient-to-r ${item.color} text-white shadow-lg`
-                        : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
+                        : "text-gray-300 hover:text-white hover:bg-gray-800/50"
                     }`}
                     variants={navItemVariants}
                     whileHover="hover"
@@ -118,7 +123,11 @@ export default function Dashboard() {
                       <motion.div
                         className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent rounded-lg"
                         layoutId="activeTab"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        transition={{
+                          type: "spring",
+                          bounce: 0.2,
+                          duration: 0.6,
+                        }}
                       />
                     )}
                   </motion.button>
@@ -129,10 +138,12 @@ export default function Dashboard() {
         </div>
       </motion.nav>
 
-      {/* Content */}
-      <motion.main 
-        className="relative z-10"
-        variants={itemVariants}
+      {/* Main Content Area */}
+      <motion.main
+        className="flex-1 relative min-h-0"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -141,10 +152,11 @@ export default function Dashboard() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="h-full"
           >
-            {currentView === 'chat' && <Chat />}
-            {currentView === 'admin' && <AdminPanel />}
-            {currentView === 'logs' && <QueryLog />}
+            {currentView === "chat" && <Chat />}
+            {currentView === "admin" && <AdminPanel />}
+            {currentView === "logs" && <QueryLog />}
           </motion.div>
         </AnimatePresence>
       </motion.main>
@@ -172,6 +184,6 @@ export default function Dashboard() {
           />
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }

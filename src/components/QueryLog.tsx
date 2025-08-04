@@ -51,7 +51,7 @@ export default function QueryLog() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="h-[calc(100vh-64px)] bg-black text-white p-6 overflow-y-auto">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">

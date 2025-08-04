@@ -185,9 +185,9 @@ export default function Chat() {
   const currentChannel = channels.find((c) => c.id === activeChannel);
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex h-[calc(100vh-64px)] bg-black">
       {/* Mobile Menu Button */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
+      <div className="md:hidden fixed top-20 left-4 z-50">
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-3 bg-black/80 backdrop-blur-xl border border-gray-800/50 rounded-xl shadow-2xl transition-all duration-200 hover:scale-105"
