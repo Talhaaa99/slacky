@@ -73,10 +73,9 @@ export function DatabaseConnections() {
       const result = await response.json();
 
       if (result.success) {
+        // Store the schema with the required mapping property
         updateSchema(connection.id, {
-          tables: connection.type === "postgresql" ? result.schema : undefined,
-          collections:
-            connection.type === "mongodb" ? result.schema : undefined,
+          ...result.schema,
           mapping: {},
         });
 

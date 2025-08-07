@@ -2,85 +2,23 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/store/useStore";
+import { Send, Loader2, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { ChatMessage } from "@/types";
-import { generateId, formatDate } from "@/lib/utils";
-import { Send, Bot, User, Database, AlertCircle, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import ResultsTable from "@/components/ResultsTable";
 
-// Add the generateResultSummary function
-function generateResultSummary(
-  result: any,
-  query: string,
-  databaseType: string
-): string {
-  if (!result || !Array.isArray(result)) {
-    return "No results found for your query.";
-  }
-
-  const count = result.length;
-
-  if (count === 0) {
-    return "Your query returned no results.";
-  }
-
-  // Try to determine what the query is about based on keywords
-  const lowerQuery = query.toLowerCase();
-
-  if (lowerQuery.includes("count") || lowerQuery.includes("count(")) {
-    return `Found ${count} total records matching your criteria.`;
-  }
-
-  if (
-    lowerQuery.includes("sum") ||
-    lowerQuery.includes("total") ||
-    lowerQuery.includes("revenue")
-  ) {
-    if (result[0] && typeof result[0] === "object") {
-      const firstResult = result[0];
-      const totalKey = Object.keys(firstResult).find(
-        (key) =>
-          key.toLowerCase().includes("total") ||
-          key.toLowerCase().includes("sum") ||
-          key.toLowerCase().includes("revenue")
-      );
-      if (totalKey) {
-        return `Total ${totalKey.replace(/_/g, " ")}: ${firstResult[totalKey]}`;
-      }
-    }
-    return `Found ${count} aggregated results.`;
-  }
-
-  if (lowerQuery.includes("user") || lowerQuery.includes("customer")) {
-    return `Found ${count} user${count !== 1 ? "s" : ""} in the database.`;
-  }
-
-  if (lowerQuery.includes("order") || lowerQuery.includes("purchase")) {
-    return `Found ${count} order${count !== 1 ? "s" : ""} in the database.`;
-  }
-
-  if (lowerQuery.includes("product") || lowerQuery.includes("item")) {
-    return `Found ${count} product${count !== 1 ? "s" : ""} in the database.`;
-  }
-
-  // Default summary
-  return `Found ${count} record${count !== 1 ? "s" : ""} matching your query.`;
+interface ClarificationContext {
+  originalMessage: string;
+  question: string;
+  options?: string[];
 }
 
-export function Chat() {
-  const {
-    messages,
-    addMessage,
-    activeConnection,
-    isLoading,
-    setLoading,
-    schemas,
-  } = useStore();
+export default function Chat() {
+  const { activeConnection, schemas, addMessage } = useStore();
   const [input, setInput] = useState("");
-  const [clarificationContext, setClarificationContext] = useState<{
-    originalMessage: string;
-    clarificationQuestion: string;
-  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [clarificationContext, setClarificationContext] =
+    useState<ClarificationContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -89,7 +27,180 @@ export function Chat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [useStore.getState().messages]);
+
+  const generateId = () => Math.random().toString(36).substr(2, 9);
+
+  const generateAISummary = async (
+    query: string,
+    results: any,
+    userQuestion: string
+  ): Promise<string> => {
+    try {
+      const summaryResponse = await fetch("/api/generate-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          results,
+          userQuestion,
+        }),
+      });
+
+      if (summaryResponse.ok) {
+        const summaryResult = await summaryResponse.json();
+        if (summaryResult.success && summaryResult.summary) {
+          return summaryResult.summary;
+        }
+      }
+
+      // Fallback to simple summary
+      const count = Array.isArray(results.result) ? results.result.length : 0;
+      return `Found ${count} results for your query.`;
+    } catch (error) {
+      console.error("Error generating AI summary:", error);
+      const count = Array.isArray(results.result) ? results.result.length : 0;
+      return `Found ${count} results for your query.`;
+    }
+  };
+
+  const handleClarificationSelect = async (selectedTable: string) => {
+    if (!clarificationContext) return;
+
+    // Add user's selection as a message
+    const selectionMessage: ChatMessage = {
+      id: generateId(),
+      role: "user",
+      content: `I want to use the "${selectedTable}" table.`,
+      timestamp: new Date(),
+    };
+    addMessage(selectionMessage);
+
+    setIsLoading(true);
+    setClarificationContext(null);
+
+    try {
+      const schema = schemas[activeConnection!.id];
+
+      // Generate query with clarification
+      const generateResponse = await fetch("/api/generate-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: clarificationContext.originalMessage,
+          schema,
+          mapping: schema.mapping || {},
+          databaseType: activeConnection!.type,
+          clarificationResponse: { selectedTable },
+        }),
+      });
+
+      if (!generateResponse.ok) {
+        const errorData = await generateResponse.json();
+        throw new Error(errorData.error || "Failed to generate query");
+      }
+
+      const generateResult = await generateResponse.json();
+
+      // Check for further clarification needs
+      if (generateResult.needsClarification) {
+        const clarificationMessage: ChatMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: generateResult.question,
+          timestamp: new Date(),
+        };
+        addMessage(clarificationMessage);
+
+        setClarificationContext({
+          originalMessage: clarificationContext.originalMessage,
+          question: generateResult.question,
+          options: generateResult.options,
+        });
+        return;
+      }
+
+      // Execute the query
+      const executeResponse = await fetch("/api/execute-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: generateResult.query,
+          connection: activeConnection,
+        }),
+      });
+
+      if (!executeResponse.ok) {
+        const errorData = await executeResponse.json();
+
+        // Handle specific database errors intelligently
+        if (errorData.errorType === "INCOMPLETE_QUERY") {
+          const retryMessage: ChatMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: `${errorData.error}\n\nLet me try to generate a complete query for you. Please ask your question again and I'll make sure to provide a full SQL statement.`,
+            timestamp: new Date(),
+          };
+          addMessage(retryMessage);
+          setIsLoading(false);
+          return;
+        }
+
+        if (
+          errorData.errorType === "TABLE_NOT_FOUND" ||
+          errorData.errorType === "COLUMN_NOT_FOUND"
+        ) {
+          const clarificationMessage: ChatMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: `${errorData.error}\n\nWould you like me to:\n1. Show you the available tables/columns in the Schema tab\n2. Try a different approach to your question\n3. Help you rephrase your query\n\nPlease let me know how you'd like to proceed.`,
+            timestamp: new Date(),
+          };
+          addMessage(clarificationMessage);
+          setIsLoading(false);
+          return;
+        }
+
+        throw new Error(errorData.error || "Failed to execute query");
+      }
+
+      const result = await executeResponse.json();
+
+      // Generate AI summary
+      const aiSummary = await generateAISummary(
+        generateResult.query,
+        result,
+        clarificationContext.originalMessage
+      );
+
+      const assistantMessage: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content: aiSummary,
+        timestamp: new Date(),
+        queryData: {
+          query: generateResult.query,
+          results: result.result || [],
+          rawResponse: result,
+        },
+      };
+
+      addMessage(assistantMessage);
+    } catch (error) {
+      console.error("Error:", error);
+      const errorMessage: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content: `Sorry, I encountered an error processing your request. ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        timestamp: new Date(),
+      };
+      addMessage(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,20 +212,14 @@ export function Chat() {
       content: input,
       timestamp: new Date(),
     };
+
     addMessage(userMessage);
+    const originalInput = input;
     setInput("");
-    setLoading(true);
+    setIsLoading(true);
 
     try {
-      // Get schema and mapping for the active connection
       const schema = schemas[activeConnection.id];
-      const mapping = schema?.mapping || {};
-
-      // Debug logging
-      console.log("Active connection:", activeConnection);
-      console.log("Schema:", schema);
-      console.log("Mapping:", mapping);
-
       if (!schema) {
         throw new Error(
           "No schema available for this database. Please reconnect the database to load the schema."
@@ -124,290 +229,277 @@ export function Chat() {
       // Generate query using AI
       const generateResponse = await fetch("/api/generate-query", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: input,
+          message: originalInput,
           schema,
-          mapping,
+          mapping: schema.mapping || {},
           databaseType: activeConnection.type,
         }),
       });
 
-      const generateResult = await generateResponse.json();
-
-      if (!generateResult.success) {
-        throw new Error(generateResult.error || "Failed to generate query");
+      if (!generateResponse.ok) {
+        const errorData = await generateResponse.json();
+        throw new Error(errorData.error || "Failed to generate query");
       }
+
+      const generateResult = await generateResponse.json();
 
       // Check if clarification is needed
       if (generateResult.needsClarification) {
         const clarificationMessage: ChatMessage = {
           id: generateId(),
           role: "assistant",
-          content: generateResult.clarificationQuestion,
+          content: generateResult.question,
           timestamp: new Date(),
-          needsClarification: true,
         };
         addMessage(clarificationMessage);
+
         setClarificationContext({
-          originalMessage: input,
-          clarificationQuestion: generateResult.clarificationQuestion,
+          originalMessage: originalInput,
+          question: generateResult.question,
+          options: generateResult.options,
         });
+        setIsLoading(false);
         return;
       }
 
-      // If this is a response to a clarification, use the original message
-      const queryMessage = clarificationContext
-        ? clarificationContext.originalMessage
-        : input;
-      setClarificationContext(null); // Clear the context
-
-      const generatedQuery = generateResult.query;
-
-      // Execute the generated query
+      // Execute the query
       const executeResponse = await fetch("/api/execute-query", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          query: generateResult.query,
           connection: activeConnection,
-          query: generatedQuery,
         }),
       });
 
-      const executeResult = await executeResponse.json();
+      if (!executeResponse.ok) {
+        const errorData = await executeResponse.json();
 
-      // Generate summary of results
-      let summary = "";
-      if (executeResult.success && executeResult.result) {
-        summary = generateResultSummary(
-          executeResult.result,
-          generatedQuery,
-          activeConnection.type
-        );
+        // Handle specific database errors intelligently
+        if (errorData.errorType === "INCOMPLETE_QUERY") {
+          const retryMessage: ChatMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: `${errorData.error}\n\nLet me try to generate a complete query for you. Please ask your question again and I'll make sure to provide a full SQL statement.`,
+            timestamp: new Date(),
+          };
+          addMessage(retryMessage);
+          setIsLoading(false);
+          return;
+        }
+
+        if (
+          errorData.errorType === "TABLE_NOT_FOUND" ||
+          errorData.errorType === "COLUMN_NOT_FOUND"
+        ) {
+          const clarificationMessage: ChatMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: `${errorData.error}\n\nWould you like me to:\n1. Show you the available tables/columns in the Schema tab\n2. Try a different approach to your question\n3. Help you rephrase your query\n\nPlease let me know how you'd like to proceed.`,
+            timestamp: new Date(),
+          };
+          addMessage(clarificationMessage);
+          setIsLoading(false);
+          return;
+        }
+
+        throw new Error(errorData.error || "Failed to execute query");
       }
+
+      const result = await executeResponse.json();
+
+      // Generate AI summary
+      const aiSummary = await generateAISummary(
+        generateResult.query,
+        result,
+        originalInput
+      );
 
       const assistantMessage: ChatMessage = {
         id: generateId(),
         role: "assistant",
-        content: executeResult.success
-          ? `${summary}\n\nHere are the results for your query: "${queryMessage}"`
-          : `I couldn't execute the query. ${executeResult.error}`,
+        content: aiSummary,
         timestamp: new Date(),
-        sqlQuery: generatedQuery,
-        result: executeResult.success ? executeResult.result : undefined,
-        error: executeResult.success ? undefined : executeResult.error,
+        queryData: {
+          query: generateResult.query,
+          results: result.result || [],
+          rawResponse: result,
+        },
       };
 
       addMessage(assistantMessage);
     } catch (error) {
+      console.error("Error:", error);
       const errorMessage: ChatMessage = {
         id: generateId(),
         role: "assistant",
-        content: "Sorry, I encountered an error processing your request.",
+        content: `Sorry, I encountered an error processing your request. ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
         timestamp: new Date(),
-        error: error instanceof Error ? error.message : "Unknown error",
       };
       addMessage(errorMessage);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const messages = useStore((state) => state.messages);
+
   if (!activeConnection) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="h-full flex items-center justify-center bg-black"
-      >
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <Database className="w-20 h-20 text-gray-600 mx-auto mb-6" />
-          <h2 className="text-2xl font-semibold mb-3 text-white">
-            No Database Selected
-          </h2>
-          <p className="text-gray-400 max-w-md mx-auto">
-            Please select a database connection to start chatting with your data
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-800 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-gray-600 rounded-full"></div>
+          </div>
+          <h3 className="text-lg font-semibold text-white text-shadow mb-2">
+            No Database Connected
+          </h3>
+          <p className="text-gray-400 text-shadow-sm">
+            Connect to a database to start chatting
           </p>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-black">
-      {/* Chat Header */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="p-6 border-b border-gray-800 bg-gray-900"
-      >
-        <div className="flex items-center space-x-4">
-          <div className="p-2 bg-white rounded-lg">
-            <Database className="w-6 h-6 text-black" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-white">
-              {activeConnection.name}
-            </h2>
-            <p className="text-sm text-gray-400 capitalize font-mono">
-              {activeConnection.type} • {activeConnection.host}:
-              {activeConnection.port}
+    <div className="h-full flex flex-col">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-800 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-600 rounded-full"></div>
+            </div>
+            <h3 className="text-lg font-semibold text-white text-shadow mb-2">
+              Start a Conversation
+            </h3>
+            <p className="text-gray-400 text-shadow-sm">
+              Ask questions about your database in natural language
             </p>
           </div>
-        </div>
-      </motion.div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        <AnimatePresence>
-          {messages.length === 0 ? (
+        ) : (
+          messages.map((message) => (
             <motion.div
+              key={message.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center py-16"
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
+              }`}
             >
-              <div className="relative">
-                <Bot className="w-20 h-20 text-gray-600 mx-auto mb-6" />
-                <Sparkles className="w-8 h-8 text-gray-500 absolute -top-2 -right-2" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-4 text-white">
-                Start a conversation
-              </h3>
-              <p className="text-gray-400 mb-8 max-w-lg mx-auto">
-                Ask me anything about your database. I'll help you query and
-                understand your data.
-              </p>
-              <div className="space-y-3 text-sm text-gray-500 max-w-md mx-auto">
-                <div className="p-3 bg-gray-900 rounded-lg border border-gray-800">
-                  <p className="font-mono">
-                    "Show me all users from last month"
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-900 rounded-lg border border-gray-800">
-                  <p className="font-mono">
-                    "What's the total revenue by country?"
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-900 rounded-lg border border-gray-800">
-                  <p className="font-mono">
-                    "Get the top 10 customers by order value"
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            messages.map((message, index) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className={cn(
-                  "flex space-x-4",
-                  message.role === "user" ? "justify-end" : "justify-start"
-                )}
+              <div
+                className={`max-w-[90%] space-y-3 ${
+                  message.role === "user" ? "items-end" : "items-start"
+                }`}
               >
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  className={cn(
-                    "max-w-[80%] rounded-2xl p-4 shadow-lg",
+                {/* Message Bubble */}
+                <div
+                  className={`rounded-2xl px-4 py-3 ${
                     message.role === "user"
-                      ? "bg-white text-black"
-                      : "bg-gray-900 border border-gray-800"
-                  )}
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-100"
+                  }`}
                 >
-                  <div className="flex items-start space-x-3">
-                    {message.role === "user" ? (
-                      <User className="w-5 h-5 mt-1 flex-shrink-0 text-black" />
-                    ) : (
-                      <Bot className="w-5 h-5 mt-1 flex-shrink-0 text-gray-400" />
+                  <div className="flex items-start space-x-2">
+                    {message.role === "assistant" && (
+                      <Sparkles className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                     )}
-                    <div className="flex-1">
-                      <p className="text-sm whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                      {message.sqlQuery && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="mt-3 p-3 bg-black rounded-lg border border-gray-700"
-                        >
-                          <p className="text-xs font-mono text-gray-300">
-                            {message.sqlQuery}
-                          </p>
-                        </motion.div>
-                      )}
-                      {message.result && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="mt-3"
-                        >
-                          <p className="text-xs text-gray-400 mb-2">Result:</p>
-                          <div className="max-h-60 overflow-auto">
-                            <pre className="text-xs bg-black p-3 rounded-lg border border-gray-700 text-gray-300">
-                              {JSON.stringify(message.result, null, 2)}
-                            </pre>
-                          </div>
-                        </motion.div>
-                      )}
-                      {message.error && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="mt-3 flex items-center space-x-2 text-red-400"
-                        >
-                          <AlertCircle className="w-4 h-4" />
-                          <span className="text-xs">{message.error}</span>
-                        </motion.div>
-                      )}
-                      <p className="text-xs opacity-60 mt-2 font-mono">
-                        {formatDate(message.timestamp)}
-                      </p>
+                    <div className="whitespace-pre-wrap text-sm">
+                      {message.content}
                     </div>
                   </div>
-                </motion.div>
-              </motion.div>
-            ))
-          )}
-        </AnimatePresence>
+                </div>
+
+                {/* Results Table */}
+                {message.role === "assistant" && message.queryData && (
+                  <div className="w-full">
+                    <ResultsTable
+                      data={message.queryData.results}
+                      query={message.queryData.query}
+                      isExpanded={false}
+                    />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ))
+        )}
+
+        {/* Clarification Options */}
+        {clarificationContext && clarificationContext.options && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="bg-gray-800 text-gray-100 rounded-2xl px-4 py-3 max-w-[80%]">
+              <p className="text-sm mb-3">Select a table:</p>
+              <div className="flex flex-wrap gap-2">
+                {clarificationContext.options.map((option) => (
+                  <motion.button
+                    key={option}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleClarificationSelect(option)}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+                    disabled={isLoading}
+                  >
+                    {option}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="bg-gray-800 text-gray-100 rounded-2xl px-4 py-3">
+              <div className="flex items-center space-x-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">
+                  {clarificationContext
+                    ? "Processing your selection..."
+                    : "Analyzing your query..."}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="p-6 border-t border-gray-800 bg-gray-900"
-      >
+      <div className="p-4 border-t border-white/20">
         <form onSubmit={handleSubmit} className="flex space-x-3">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              clarificationContext
-                ? "Please specify which table/collection you want to query..."
-                : "Ask about your database..."
-            }
-            className="flex-1 p-4 border border-gray-700 rounded-xl bg-black text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent transition-all duration-200"
-            disabled={isLoading}
+            placeholder="Ask a question about your database..."
+            className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            disabled={isLoading || !!clarificationContext}
           />
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             type="submit"
-            disabled={!input.trim() || isLoading}
-            className="p-4 bg-white text-black rounded-xl hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
+            disabled={isLoading || !input.trim() || !!clarificationContext}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-xl px-4 py-3 transition-colors duration-200"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </motion.button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }

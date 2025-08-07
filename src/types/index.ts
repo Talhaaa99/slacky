@@ -37,13 +37,14 @@ export interface FieldSchema {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  sqlQuery?: string;
-  result?: any;
-  error?: string;
-  needsClarification?: boolean;
+  queryData?: {
+    query: string;
+    results: any[];
+    rawResponse: any;
+  };
 }
 
 export interface TableMapping {

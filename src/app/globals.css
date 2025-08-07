@@ -84,6 +84,25 @@
   @apply bg-gray-600;
 }
 
+/* Custom scrollbar for schema visualizer */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(55, 65, 81, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.5);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
 /* Glow effects */
 .glow {
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
@@ -94,6 +113,11 @@
 }
 
 .glow-blue {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+/* Glow effect for hover states */
+.shadow-glow {
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
 }
 

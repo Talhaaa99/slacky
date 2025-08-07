@@ -1,16 +1,29 @@
 "use client";
 
 import { useStore } from "@/store/useStore";
-import { Sidebar } from "@/components/Sidebar";
-import { Chat } from "@/components/Chat";
+import { motion } from "framer-motion";
+import Chat from "@/components/Chat";
 import { DatabaseConnections } from "@/components/DatabaseConnections";
-import { SchemaVisualizer } from "@/components/SchemaVisualizer";
-import { Dock } from "@/components/Dock";
-import { Settings } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import SchemaVisualizer from "@/components/SchemaVisualizer";
+import { Sidebar } from "@/components/Sidebar";
+import {
+  Settings,
+  MessageSquare,
+  Database,
+  Eye,
+  Settings as SettingsIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
-  const { activeTab, sidebarOpen, setSidebarOpen } = useStore();
+  const { activeTab, sidebarOpen, setSidebarOpen, setActiveTab } = useStore();
+
+  const tabs = [
+    { id: "chat", label: "Chat", icon: MessageSquare },
+    { id: "connections", label: "Databases", icon: Database },
+    { id: "schema", label: "Schema", icon: Eye },
+    { id: "settings", label: "Settings", icon: SettingsIcon },
+  ];
 
   const renderContent = () => {
     switch (activeTab) {
@@ -38,56 +51,78 @@ export default function Home() {
   return (
     <div className="h-screen bg-black text-white overflow-hidden">
       {/* Mobile Overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+        onClick={() => setSidebarOpen(false)}
+      />
 
-      {/* Top Navigation - Simplified */}
+      {/* Top Navigation with Tab Selector */}
       <motion.nav
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="h-16 bg-black/50 backdrop-blur-xl border-b border-white/20 flex items-center px-6 z-30 relative component-shadow"
+        className="h-20 bg-black/50 backdrop-blur-xl border-b border-white/20 flex items-center px-6 z-30 relative component-shadow"
       >
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 hover:bg-white/10 rounded-xl mr-4 transition-colors"
-        >
-          <div className="w-6 h-6 flex flex-col justify-center space-y-1">
-            <div className="w-full h-0.5 bg-white rounded"></div>
-            <div className="w-full h-0.5 bg-white rounded"></div>
-            <div className="w-full h-0.5 bg-white rounded"></div>
-          </div>
-        </button>
+        <div className="flex items-center space-x-6">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+          >
+            <div className="w-6 h-6 flex flex-col justify-center space-y-1">
+              <div className="w-full h-0.5 bg-white rounded"></div>
+              <div className="w-full h-0.5 bg-white rounded"></div>
+              <div className="w-full h-0.5 bg-white rounded"></div>
+            </div>
+          </button>
 
-        <h1 className="text-xl font-semibold text-white text-shadow">
-          Database Assistant
-        </h1>
+          <h1 className="text-xl font-semibold text-white text-shadow">
+            Database Assistant
+          </h1>
+        </div>
+
+        {/* Tab Selector */}
+        <div className="flex-1 flex justify-center">
+          <div className="flex space-x-1 bg-gray-900 bg-opacity-50 rounded-xl p-1 backdrop-blur-sm">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+
+              return (
+                <motion.button
+                  key={tab.id}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={cn(
+                    "flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200",
+                    isActive
+                      ? "bg-white text-black shadow-lg"
+                      : "text-gray-400 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
       </motion.nav>
 
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-64px)]">
+      <div className="flex h-[calc(100vh-80px)]">
         {/* Sidebar */}
-        <AnimatePresence>
-          {sidebarOpen && (
-            <motion.div
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed md:relative inset-y-0 left-0 z-50 md:z-auto"
-            >
-              <Sidebar />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div
+          initial={{ x: -300 }}
+          animate={{ x: 0 }}
+          exit={{ x: -300 }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="fixed md:relative inset-y-0 left-0 z-50 md:z-auto"
+        >
+          <Sidebar />
+        </motion.div>
 
         {/* Content Area */}
         <motion.div
@@ -95,23 +130,18 @@ export default function Home() {
           animate={{ opacity: 1 }}
           className="flex-1 overflow-hidden"
         >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="h-full"
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            className="h-full"
+          >
+            {renderContent()}
+          </motion.div>
         </motion.div>
       </div>
-
-      {/* Dock Navigation */}
-      <Dock />
     </div>
   );
 }
