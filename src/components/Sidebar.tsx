@@ -1,139 +1,131 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Channel } from "@/types/chat";
+import { useState } from "react";
+import { useStore } from "@/store/useStore";
+import { Database, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Hash, Zap, Users } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-interface SidebarProps {
-  channels: Channel[];
-  activeChannel: string;
-  onChannelSelect: (channelId: string) => void;
-}
+export function Sidebar() {
+  const {
+    connections,
+    activeConnection,
+    setActiveConnection,
+    removeConnection,
+    setSidebarOpen,
+    setActiveTab,
+  } = useStore();
 
-const itemVariants = {
-  hidden: { x: -20, opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      duration: 0.3,
-    },
-  },
-};
+  const handleAddDatabase = () => {
+    // Switch to connections tab and close sidebar on mobile
+    setActiveTab("connections");
+    setSidebarOpen(false);
+  };
 
-export default function Sidebar({
-  channels,
-  activeChannel,
-  onChannelSelect,
-}: SidebarProps) {
   return (
     <motion.div
-      className="w-80 bg-black/90 backdrop-blur-xl border-r border-gray-800/50 flex flex-col h-full"
-      initial="hidden"
-      animate="visible"
-      variants={itemVariants}
+      initial={{ x: -300 }}
+      animate={{ x: 0 }}
+      className="h-full flex flex-col bg-gray-900 border-r border-gray-800"
     >
       {/* Header */}
-      <motion.div
-        className="p-6 border-b border-gray-800/50"
-        variants={itemVariants}
-      >
-        <motion.div
-          className="flex items-center mb-2"
-          whileHover={{ scale: 1.02 }}
-        >
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mr-3">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
+      <div className="p-4 border-b border-gray-800">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Slacky
-            </h1>
-            <p className="text-sm text-gray-400">Postgres Assistant</p>
+            <h2 className="text-lg font-semibold text-white">Databases</h2>
+            <p className="text-sm text-gray-400">Connected databases</p>
           </div>
-        </motion.div>
-      </motion.div>
-
-      {/* Channels */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          <motion.h2
-            className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center"
-            variants={itemVariants}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-2 hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <Hash className="w-3 h-3 mr-2" />
-            Channels
-          </motion.h2>
-          <div className="space-y-2">
-            {channels.map((channel, index) => (
-              <motion.button
-                key={channel.id}
-                onClick={() => onChannelSelect(channel.id)}
-                className={cn(
-                  "w-full flex items-center px-4 py-3 text-sm rounded-xl transition-all duration-300 relative overflow-hidden",
-                  activeChannel === channel.id
-                    ? "bg-gradient-to-r from-blue-500/20 to-purple-600/20 text-white border border-blue-500/30"
-                    : "text-gray-300 hover:text-white hover:bg-gray-800/30"
-                )}
-                variants={itemVariants}
-                whileHover={{
-                  scale: 1.02,
-                  x: 5,
-                }}
-                whileTap={{ scale: 0.98 }}
-                custom={index}
-              >
-                {activeChannel === channel.id && (
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-600/10"
-                    layoutId="activeChannel"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <div className="relative z-10 flex items-center w-full">
-                  <Hash className="w-4 h-4 mr-3 flex-shrink-0" />
-                  <span className="truncate">{channel.name}</span>
-                  {activeChannel === channel.id && (
-                    <motion.div
-                      className="ml-auto w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2 }}
-                    />
-                  )}
-                </div>
-              </motion.button>
-            ))}
-          </div>
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
         </div>
       </div>
 
-      {/* Footer */}
-      <motion.div
-        className="p-6 border-t border-gray-800/50"
-        variants={itemVariants}
-      >
-        <motion.div
-          className="flex items-center space-x-3 p-3 bg-gray-900/50 rounded-xl border border-gray-800/50"
-          whileHover={{ scale: 1.02 }}
-        >
-          <div className="relative">
-            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-              <Users className="w-4 h-4 text-white" />
-            </div>
+      {/* Connections List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <AnimatePresence>
+          {connections.length === 0 ? (
             <motion.div
-              className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-black"
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white">Online</p>
-            <p className="text-xs text-gray-400">Connected to Slack</p>
-          </div>
-        </motion.div>
-      </motion.div>
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-12"
+            >
+              <Database className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-sm text-gray-400 mb-2">
+                No databases connected
+              </p>
+              <p className="text-xs text-gray-500">
+                Add a database to get started
+              </p>
+            </motion.div>
+          ) : (
+            connections.map((connection, index) => (
+              <motion.div
+                key={connection.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className={cn(
+                  "p-4 rounded-xl border cursor-pointer transition-all duration-200 hover:scale-105",
+                  activeConnection?.id === connection.id
+                    ? "bg-white text-black border-white glow"
+                    : "bg-gray-800 border-gray-700 hover:border-gray-600 hover:bg-gray-700"
+                )}
+                onClick={() => setActiveConnection(connection)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Database
+                      className={cn(
+                        "w-5 h-5",
+                        activeConnection?.id === connection.id
+                          ? "text-black"
+                          : "text-gray-400"
+                      )}
+                    />
+                    <div>
+                      <p className="font-medium text-sm">{connection.name}</p>
+                      <p className="text-xs opacity-70 capitalize">
+                        {connection.type}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeConnection(connection.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-500 hover:text-white rounded-lg transition-all duration-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3 text-xs opacity-70 font-mono">
+                  {connection.host}:{connection.port}
+                </div>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-800">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleAddDatabase}
+          className="w-full flex items-center justify-center space-x-2 p-3 rounded-xl border border-dashed border-gray-600 hover:border-gray-500 hover:bg-gray-800 transition-all duration-200"
+        >
+          <Plus className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-400">Add Database</span>
+        </motion.button>
+      </div>
     </motion.div>
   );
 }
